@@ -1,0 +1,14 @@
+import fs from 'node:fs/promises';import path from 'node:path';import {validatePortablePacket} from './coding-portable-packet.mjs';
+export async function linuxWorkerCommand({packet,root,image,platform=process.platform}){
+ validatePortablePacket(packet);if(platform!=='linux')throw Error('linux-isolation-runtime-unavailable');if(!/^node@sha256:[a-f0-9]{64}$/.test(image??''))throw Error('pinned-node-image-required');
+ root=await fs.realpath(root);const input=path.join(root,'input'),output=path.join(root,'output');for(const p of [input,output]){const stat=await fs.lstat(p);if(!stat.isDirectory()||stat.isSymbolicLink()||await fs.realpath(p)!==p||p.includes(','))throw Error('unsafe-task-mount');}
+ return {containerName:'rs-trial-'+packet.attemptID,executable:'docker',args:['run','--name','rs-trial-'+packet.attemptID,'--rm','--pull=never','--network=none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit=32','--memory=512m','--memory-swap=512m','--cpus=1','--user=65534:65534','--tmpfs','/task:rw,nosuid,noexec,size=32m,mode=1777','--mount',`type=bind,src=${input},dst=/input,readonly`,'--mount',`type=bind,src=${output},dst=/output`,image,'node','/input/guest.mjs'],timeoutMs:packet.durationMs,cloudVerified:false};
+}
+export const LINUX_FIXED_GUEST=String.raw`import fs from 'node:fs';import {createHash} from 'node:crypto';import {execFileSync} from 'node:child_process';
+const p=JSON.parse(fs.readFileSync('/input/PACKET.json')),names=['backend-limit.mjs','backend-limit.test.mjs'],sha=x=>createHash('sha256').update(x).digest('hex');
+for(const n of names){if(sha(p.files[n])!==p.before[n])throw Error('input fingerprint');fs.writeFileSync('/task/'+n,p.files[n]);}
+if(p.files[names[0]].trim()!=='export function validateLimit(value) { return Number.isSafeInteger(value) && value >= 0 && value <= 100; }')throw Error('fixed source required');
+fs.appendFileSync('/task/'+names[0],'\nexport function normalizeLimit(value) { return value === undefined ? 20 : validateLimit(value) ? value : null; }\n');
+fs.appendFileSync('/task/'+names[1],"\nimport {normalizeLimit} from './backend-limit.mjs';\ntest('default pagination limit',()=>assert.equal(normalizeLimit(undefined),20));\ntest('invalid pagination limit rejected',()=>assert.equal(normalizeLimit(-1),null));\n");
+const args=['--test','--test-isolation=none','--test-reporter=tap',names[1]],tap=execFileSync(process.execPath,args,{cwd:'/task',encoding:'utf8',timeout:15000,maxBuffer:60000});
+const files=Object.fromEntries(names.map(n=>[n,fs.readFileSync('/task/'+n,'utf8')]));fs.writeFileSync('/output/RESULT.json',JSON.stringify({taskID:p.taskID,attemptID:p.attemptID,generation:p.generation,files,tap,args,checkpoint:Object.fromEntries(names.map(n=>[n,sha(files[n])])),executionMode:'linux-fixed-container',ai:false,guestPID:process.pid}));`;

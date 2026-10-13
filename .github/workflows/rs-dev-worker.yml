@@ -1,0 +1,56 @@
+name: RS-Dev synthetic worker trial
+on:
+  workflow_dispatch:
+    inputs:
+      approved:
+        type: boolean
+        default: false
+        required: true
+      packet_sha256:
+        type: string
+        required: true
+      node_image:
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: rs-dev-synthetic-worker
+  cancel-in-progress: false
+jobs:
+  fixed-isolated-trial:
+    if: inputs.approved && vars.RS_ZERO_SPEND_VERIFIED == 'yes'
+    environment: rs-dev-synthetic-trial
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    env:
+      RS_EXTERNAL_TRIAL_AUTHORIZED: 'yes'
+      RS_ZERO_SPEND_VERIFIED: ${{ vars.RS_ZERO_SPEND_VERIFIED }}
+      RS_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+      RS_EXPECTED_PACKET_SHA: ${{ inputs.packet_sha256 }}
+      RS_NODE_IMAGE: ${{ inputs.node_image }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Validate immutable synthetic packet
+        run: node scripts/github-trial-preflight.mjs
+      - name: Prepare approved pinned official runtime
+        run: docker pull "$RS_NODE_IMAGE"
+      - name: Execute isolated fixed task
+        run: node scripts/prepare-linux-worker-trial.mjs tasks/PACKET.json trial "$RS_NODE_IMAGE"
+      - name: Sign result outside isolated task
+        env:
+          RS_EXTERNAL_WORKER_ID: github-fixed-worker
+          RS_EXTERNAL_SIGNING_KEY: ${{ secrets.RS_EXTERNAL_SIGNING_KEY }}
+        run: node scripts/seal-github-result.mjs tasks/PACKET.json trial/output/RESULT.json BUNDLE.json "$RS_NODE_IMAGE"
+      - name: Persist signed result only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rs-dev-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: BUNDLE.json
+          retention-days: 1
+          if-no-files-found: error
