@@ -1,5 +1,5 @@
 export const SELECTED_MODEL='qwen3:4b';
-export const SELECTED_MANIFEST='359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7';
+export const SELECTED_MANIFEST='5f89ba1e51f6aa6294710cad300e995341b5d1a06d2c6f26af7626cb56b77929';
 export const profiles=Object.freeze({
  'qwen3:1.7b':Object.freeze({model:'qwen3:1.7b',contextTokens:8192,maxOutputTokens:1024,temperature:0.6,topP:0.95,reasoningEffort:'none',inferenceTimeoutMs:90000,cliTimeoutMs:160000,maximumRequests:12,maxPromptBytes:128000}),
  'qwen3:4b':Object.freeze({model:SELECTED_MODEL,contextTokens:4096,maxOutputTokens:512,temperature:0.7,topP:0.8,reasoningEffort:'none',inferenceTimeoutMs:120000,cliTimeoutMs:170000,maximumRequests:8,maxPromptBytes:10000})
