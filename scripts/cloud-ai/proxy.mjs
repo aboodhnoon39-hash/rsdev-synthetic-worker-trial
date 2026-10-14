@@ -15,3 +15,9 @@ export async function startInferenceProxy({emit,recordProtocol=async()=>{},trans
  }catch(e){emit({type:'inference-rejected',reason:e.message});if(!res.headersSent)res.writeHead(403,{'content-type':'application/json'});res.end(JSON.stringify({error:{message:e.message}}));}finally{if(owns)busy=false;}});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));return {port:server.address().port,count:()=>count,close:()=>new Promise(resolve=>server.close(resolve))};
 }
+
+export async function waitForPinnedOllama({expectedModelDigest,emit=()=>{},transport=url=>fetch(url,{signal:AbortSignal.timeout(1000)}),pause=()=>new Promise(r=>setTimeout(r,100)),maximum=100}){
+ if(!/^[a-f0-9]{64}$/.test(expectedModelDigest??''))throw Error('pinned-model-digest-required');
+ let ready=false,last;for(let i=0;i<maximum;i++){try{const r=await transport('http://127.0.0.1:11434/api/version');if(r.ok){const b=await r.json();if(b.version!=='0.40.3')throw Error('ollama-version-mismatch');ready=true;break;}last='version-http-'+r.status;}catch(e){if(e.message==='ollama-version-mismatch')throw e;last=e.message;}await pause();}if(!ready)throw Error('ollama-not-ready:'+last);
+ const r=await transport('http://127.0.0.1:11434/api/tags'),text=await r.text();if(Buffer.byteLength(text)>64000)throw Error('model-list-too-large');emit({type:'ollama-model-list',status:r.status,body:text});if(!r.ok)throw Error('ollama-model-list-http-'+r.status+':'+text);const b=JSON.parse(text);if(!Array.isArray(b.models)||!b.models.some(m=>m.name==='qwen3:1.7b'&&m.digest===expectedModelDigest))throw Error('pinned-local-model-not-visible');return {version:'0.40.3',models:b.models};
+}
