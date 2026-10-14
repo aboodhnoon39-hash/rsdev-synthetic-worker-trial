@@ -1,7 +1,7 @@
 {
   "status": "READY FOR FIRST REAL AI RUN",
   "meaning": "local readiness; not AI success or corrected Linux proof",
-  "revisionID": "model-4b-local-05977247-351f-4bfe-b9ab-ee26be33b848",
+  "revisionID": "model-4b-local-940e6587-5206-4ec7-84aa-3d24b907c63b",
   "localSecurityReviewed": true,
   "requiresGitHubStageOne": true,
   "linuxIsolationVerified": false,

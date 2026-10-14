@@ -68,6 +68,7 @@ jobs:
             DOWNLOAD-*-MEASUREMENTS.json
             DOWNLOAD-*-FAILURE.json
             RESOURCE-PREFLIGHT.json
+            MODEL-STORE-VERIFICATION.json
             trial-ai/LINUX-GATE.json
             trial-ai/STAGE-ONE-FAILURE.json
             trial-ai/ISOLATION-TRACE.jsonl
@@ -127,3 +128,4 @@ jobs:
           path: AI-BUNDLE.json
           if-no-files-found: error
           retention-days: 1
+
