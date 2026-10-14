@@ -70,6 +70,8 @@ jobs:
             trial-ai/ISOLATION-STDERR.log
             trial-ai/isolation/output/ISOLATION-PROBE.json
             trial-ai/isolation/output/ISOLATION-FAILURE.json
+            trial-ai/isolation/output/ISOLATION-CLI.jsonl
+            trial-ai/isolation/output/ISOLATION-PROTOCOL.json
             trial-ai/JOURNAL.jsonl
             trial-ai/FAILURE.json
             trial-ai/BUILD.log
