@@ -1,0 +1,2 @@
+export function executionBudget(model){return Object.freeze(model==='qwen3:4b'?{probeMs:300000,phaseMs:360000,cliMs:350000,setupReserveMs:420000,workflowMs:1800000}:{probeMs:180000,phaseMs:180000,cliMs:160000,setupReserveMs:420000,workflowMs:1800000});}
+export function guestDeadlineMs(model,phaseMs,elapsedMs){const budget=executionBudget(model);if(!Number.isFinite(elapsedMs)||elapsedMs<0||![budget.probeMs,budget.phaseMs].includes(phaseMs))throw Error('reviewed-phase-deadline-required');return Math.max(1,Math.min(budget.cliMs,phaseMs-10000-elapsedMs));}
