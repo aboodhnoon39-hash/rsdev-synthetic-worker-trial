@@ -1,0 +1,8 @@
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE}
+COPY vendor/ollama/ /usr/local/
+COPY vendor/opencode/opencode /usr/local/bin/opencode
+COPY scripts/cloud-ai/ /worker/
+ENV LD_LIBRARY_PATH=/usr/local/lib/ollama
+USER 65534:65534
+WORKDIR /task

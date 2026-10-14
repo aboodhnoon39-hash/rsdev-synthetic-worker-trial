@@ -1,0 +1,7 @@
+*
+!vendor
+!vendor/**
+!scripts
+!scripts/cloud-ai
+!scripts/cloud-ai/**
+!Dockerfile.ai

@@ -1,0 +1,17 @@
+import http from 'node:http';import {randomUUID} from 'node:crypto';import {assertToolScope,sha} from './contract.mjs';
+export async function startInferenceProxy({emit,recordProtocol=async()=>{},transport=async body=>{const r=await fetch('http://127.0.0.1:11434/v1/chat/completions',{method:'POST',redirect:'error',signal:AbortSignal.timeout(90000),headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('ollama-http-'+r.status);const text=await r.text();if(Buffer.byteLength(text)>128000)throw Error('inference-response-too-large');return JSON.parse(text);},maximum=12}){
+ let count=0,busy=false;const server=http.createServer(async(req,res)=>{let owns=false;try{
+  if(req.method!=='POST'||req.url!=='/v1/chat/completions'||busy||count>=maximum)throw Error('inference-route-or-budget');busy=true;owns=true;let bytes=0,text='';for await(const chunk of req){bytes+=chunk.length;if(bytes>128000)throw Error('inference-request-too-large');text+=chunk;}
+  const b=JSON.parse(text);if(b.model!=='qwen3:1.7b'||!Array.isArray(b.messages)||b.messages.length>30||!Array.isArray(b.tools)||b.tools.length>3||b.tools.some(t=>t.type!=='function'||!['read','write','edit'].includes(t.function?.name)))throw Error('inference-tool-policy');
+  if(b.max_tokens!==undefined&&(!Number.isInteger(b.max_tokens)||b.max_tokens<1||b.max_tokens>1024))throw Error('inference-output-budget');
+  const requestID=randomUUID(),start=Date.now();count++;emit({type:'inference-start',requestID,requestSHA256:sha(b),number:count});
+  const body={model:b.model,messages:b.messages,tools:b.tools,stream:false,max_tokens:1024,temperature:0.6,top_p:0.95,reasoning_effort:'none'};
+  await recordProtocol({requestID,kind:'request',body});const reply=await transport(body);await recordProtocol({requestID,kind:'response',body:reply});const message=reply.choices?.[0]?.message;if(!message||message.role!=='assistant')throw Error('inference-response-schema');
+  const calls=(message.tool_calls??[]).map(c=>({id:c.id,name:c.function?.name,arguments:c.function?.arguments}));assertToolScope(calls);
+  // Only protocol-level tool_calls qualify. Never parse assistant text as tools.
+  for(const c of calls)emit({type:'native-call',requestID,...c});emit({type:'inference-complete',requestID,durationMs:Date.now()-start,responseSHA256:sha(reply),nativeCalls:calls.length,usage:reply.usage??null});
+  if(b.stream){res.writeHead(200,{'content-type':'text/event-stream'});const id=reply.id??requestID,base={id,object:'chat.completion.chunk',created:reply.created??Math.floor(Date.now()/1000),model:b.model};res.write('data: '+JSON.stringify({...base,choices:[{index:0,delta:{role:'assistant',content:message.content??'',...(calls.length?{tool_calls:message.tool_calls.map((c,index)=>({...c,index}))}:{})},finish_reason:null}]})+'\n\n');res.end('data: '+JSON.stringify({...base,choices:[{index:0,delta:{},finish_reason:calls.length?'tool_calls':'stop'}],usage:reply.usage})+'\n\ndata: [DONE]\n\n');}
+  else {res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(reply));}
+ }catch(e){emit({type:'inference-rejected',reason:e.message});if(!res.headersSent)res.writeHead(403,{'content-type':'application/json'});res.end(JSON.stringify({error:{message:e.message}}));}finally{if(owns)busy=false;}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));return {port:server.address().port,count:()=>count,close:()=>new Promise(resolve=>server.close(resolve))};
+}
