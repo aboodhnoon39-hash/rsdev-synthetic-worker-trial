@@ -1,3 +1,4 @@
+import {summarizeFailureTAP} from './phase-progress.mjs';
 import {z} from './vendor-zod/index.js';
 import {createAtomicTools} from './atomic-tools.mjs';
 export default async function AtomicNativePlugin({directory}){
@@ -8,6 +9,6 @@ export default async function AtomicNativePlugin({directory}){
  const filePath=z.string();return {tool:Object.fromEntries(['read','write','edit'].map(name=>[name,{
   description:'Restricted atomic native '+name+'. Read current source before editing. Rejects unsafe, stale, no-op, repeated and multi-function edits. Returns actual protected test diagnostics.',
   args:name==='read'?{filePath}:name==='write'?{filePath,content:z.string()}:{filePath,oldString:z.string().describe('The COMPLETE exact exported target function copied from the latest real read, including function name, parameters, braces and return; never a shared return expression.'),newString:z.string().describe('The same complete function with one arithmetic bug changed; preserve its name and parameters.')},
-  execute:(args,context)=>executor.execute(name,args,context)
+  execute:async(args,context)=>{const output=await executor.execute(name,args,context);if(name==='read')return output;const value=JSON.parse(output),diagnostics=summarizeFailureTAP(value.tap);delete value.tap;return JSON.stringify({...value,diagnostics,fullTAPEvidence:'atomic-commit event'});}
  }]))};
 }

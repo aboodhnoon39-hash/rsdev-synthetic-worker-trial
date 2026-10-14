@@ -45,8 +45,12 @@ jobs:
       - name: Stage two - download pinned model only after the Linux gate passes
         if: success() && steps.linux-gate.outcome == 'success'
         run: node scripts/cloud-ai/download-runtime.mjs --model
-      - name: Stage two - real inference, native tools, protected tests, diagnosis and repair
+      - name: Independent real-model native Read and Edit gate
+        id: native-tools-gate
         if: success() && steps.linux-gate.outcome == 'success'
+        run: node scripts/cloud-ai/run-native-probe.mjs
+      - name: Stage two - real inference, native tools, protected tests, diagnosis and repair
+        if: success() && steps.linux-gate.outcome == 'success' && steps.native-tools-gate.outcome == 'success'
         run: node scripts/cloud-ai/run-linux.mjs
       - name: Save untrusted successful result for separate signing job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -75,12 +79,22 @@ jobs:
             trial-ai/isolation/output/ATOMIC-ISOLATION-CLI.jsonl
             trial-ai/isolation/output/ATOMIC-ISOLATION-RESULT.json
             trial-ai/isolation/output/ATOMIC-ISOLATION-PROTOCOL.json
+            trial-ai/NATIVE-TOOL-GATE.json
+            trial-ai/native-probe/TRACE.jsonl
+            trial-ai/native-probe/STDERR.log
+            trial-ai/native-probe/FAILURE.json
+            trial-ai/native-probe/TESTS.tap
+            trial-ai/native-probe/output/OPENCODE-CLI.jsonl
+            trial-ai/native-probe/output/PARTIAL-CHECKPOINT.json
+            trial-ai/native-probe/output/protocol/*.json
             trial-ai/JOURNAL.jsonl
+            trial-ai/TESTS-*.tap
             trial-ai/FAILURE.json
             trial-ai/BUILD.log
             trial-ai/phase-*/TRACE.jsonl
             trial-ai/phase-*/STDERR.log
             trial-ai/phase-*/output/PARTIAL-CHECKPOINT.json
+            trial-ai/phase-*/output/OPENCODE-CLI.jsonl
             trial-ai/phase-*/output/protocol/*.json
           retention-days: 1
   trusted-signing:
