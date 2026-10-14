@@ -1,6 +1,7 @@
+import {validateGeneratedSource} from './source-policy.mjs';
 import http from 'node:http';import {randomUUID} from 'node:crypto';import {assertToolScope,sha} from './contract.mjs';
 export async function startInferenceProxy({emit,recordProtocol=async()=>{},transport=async body=>{const r=await fetch('http://127.0.0.1:11434/v1/chat/completions',{method:'POST',redirect:'error',signal:AbortSignal.timeout(90000),headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('ollama-http-'+r.status);const text=await r.text();if(Buffer.byteLength(text)>128000)throw Error('inference-response-too-large');return JSON.parse(text);},maximum=12}){
- let count=0,busy=false;const server=http.createServer(async(req,res)=>{let owns=false;try{
+ let count=0,busy=false;const observedWrites=new Set();const server=http.createServer(async(req,res)=>{let owns=false;try{
   if(req.method!=='POST'||req.url!=='/v1/chat/completions'||busy||count>=maximum)throw Error('inference-route-or-budget');busy=true;owns=true;let bytes=0,text='';for await(const chunk of req){bytes+=chunk.length;if(bytes>128000)throw Error('inference-request-too-large');text+=chunk;}
   const b=JSON.parse(text);if(b.model!=='qwen3:1.7b'||!Array.isArray(b.messages)||b.messages.length>30||!Array.isArray(b.tools)||b.tools.length>3||b.tools.some(t=>t.type!=='function'||!['read','write','edit'].includes(t.function?.name)))throw Error('inference-tool-policy');
   if(b.max_tokens!==undefined&&(!Number.isInteger(b.max_tokens)||b.max_tokens<1||b.max_tokens>1024))throw Error('inference-output-budget');
@@ -8,6 +9,8 @@ export async function startInferenceProxy({emit,recordProtocol=async()=>{},trans
   const body={model:b.model,messages:b.messages,tools:scopedInferenceTools(b.tools),stream:false,max_tokens:1024,temperature:0.6,top_p:0.95,reasoning_effort:'none'};
   await recordProtocol({requestID,kind:'request',body});const reply=await transport(body);await recordProtocol({requestID,kind:'response',body:reply});const message=reply.choices?.[0]?.message;if(!message||message.role!=='assistant')throw Error('inference-response-schema');
   const calls=(message.tool_calls??[]).map(c=>({id:c.id,name:c.function?.name,arguments:c.function?.arguments}));assertToolScope(calls);
+  // Content errors are tool results, not HTTP errors. Atomic native tools reject
+  // invalid edits in OpenCode's conversation so inference can diagnose them.
   // Only protocol-level tool_calls qualify. Never parse assistant text as tools.
   for(const c of calls)emit({type:'native-call',requestID,...c});emit({type:'inference-complete',requestID,durationMs:Date.now()-start,responseSHA256:sha(reply),nativeCalls:calls.length,usage:reply.usage??null});
   if(b.stream){res.writeHead(200,{'content-type':'text/event-stream'});const id=reply.id??requestID,base={id,object:'chat.completion.chunk',created:reply.created??Math.floor(Date.now()/1000),model:b.model};res.write('data: '+JSON.stringify({...base,choices:[{index:0,delta:{role:'assistant',content:message.content??'',...(calls.length?{tool_calls:message.tool_calls.map((c,index)=>({...c,index}))}:{})},finish_reason:null}]})+'\n\n');res.end('data: '+JSON.stringify({...base,choices:[{index:0,delta:{},finish_reason:calls.length?'tool_calls':'stop'}],usage:reply.usage})+'\n\ndata: [DONE]\n\n');}
@@ -23,3 +26,5 @@ export async function waitForPinnedOllama({expectedModelDigest,emit=()=>{},trans
 }
 
 export function scopedInferenceTools(tools){return tools.map(tool=>{if(tool.type!=='function'||!['read','write','edit'].includes(tool.function?.name)||!tool.function.parameters?.properties?.filePath)throw Error('native-tool-schema-required');const copy=structuredClone(tool),allowed=copy.function.name==='read'?['/task/backend-limit.mjs','/task/backend-limit.test.mjs']:['/task/backend-limit.mjs'];copy.function.parameters.properties.filePath={...copy.function.parameters.properties.filePath,enum:allowed};copy.function.description='Use ONLY these exact filePath values: '+allowed.join(', ')+'. '+copy.function.description;return copy;});}
+
+export function assertNativeWriteProgress(calls,seen=new Set()){for(const call of calls){if(!['edit','write'].includes(call.name))continue;const a=typeof call.arguments==='string'?JSON.parse(call.arguments):call.arguments;if(call.name==='write')validateGeneratedSource(a.content);if(call.name==='edit'&&(a.oldString===a.newString||typeof a.oldString!=='string'||typeof a.newString!=='string'||a.oldString.includes('\\n')||a.newString.includes('\\n')))throw Error('native-edit-no-progress-or-literal-newline');const fingerprint=sha({name:call.name,args:a});if(seen.has(fingerprint))throw Error('repeated-native-write-without-new-strategy');seen.add(fingerprint);}return calls;}

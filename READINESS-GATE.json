@@ -1,10 +1,13 @@
 {
   "status": "READY FOR FIRST REAL AI RUN",
+  "meaning": "local readiness; not AI success or corrected Linux proof",
+  "revisionID": "atomic-final-568aedd3-9e00-4a86-89f0-c71e21822090",
   "localSecurityReviewed": true,
   "requiresGitHubStageOne": true,
   "linuxIsolationVerified": false,
   "aiInferenceVerified": false,
   "externalExecutionAuthorized": false,
   "additionalRunsAuthorized": 0,
-  "revisionID": "repair-3-a2a2f963-60e1-4729-91f8-7554402b50d2"
+  "requiresFreshExplicitApproval": true,
+  "automaticMerge": false
 }
