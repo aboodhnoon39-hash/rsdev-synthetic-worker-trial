@@ -1,0 +1,13 @@
+ARG NODE_IMAGE
+ARG PYTHON_IMAGE
+FROM ${PYTHON_IMAGE} AS python_runtime
+FROM ${NODE_IMAGE}
+COPY --from=python_runtime /usr/local/ /usr/local/
+COPY vendor/wheels/ /wheels/
+RUN ldconfig && python3.12 -m pip install --no-index --no-deps --target /opt/openhands /wheels/*.whl
+COPY vendor/codex/codex /opt/codex/codex
+COPY scripts/ /worker/
+ENV PYTHONPATH=/opt/openhands
+ENV PYTHONDONTWRITEBYTECODE=1
+USER 65534:65534
+WORKDIR /task

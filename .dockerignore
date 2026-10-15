@@ -1,7 +1,8 @@
 *
-!vendor
-!vendor/**
-!scripts
-!scripts/cloud-ai
-!scripts/cloud-ai/**
-!Dockerfile.ai
+!scripts/
+!scripts/**
+!vendor/
+!vendor/wheels/
+!vendor/wheels/**
+!vendor/codex/
+!vendor/codex/codex
