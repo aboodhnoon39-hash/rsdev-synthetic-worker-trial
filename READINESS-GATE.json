@@ -1,25 +1,31 @@
 {
-  "status": "READY FOR KIMI GATED TRIAL",
+  "status": "LOCAL REPAIR VERIFIED - CLOUD TRIAL AWAITS SPECIFIC APPROVAL",
+  "externalExecutionAuthorized": false,
+  "additionalRunsAuthorized": 0,
   "localSecurityReviewed": true,
+  "localCompletePathVerified": false,
   "requiresGitHubStageOne": true,
   "requiresExplicitConsentToLinuxSubstitution": true,
-  "localCompletePathVerified": false,
   "hostSubprocessBlock": "spawn EPERM",
   "hostContractTests": {
-    "tests": 57,
-    "pass": 48,
-    "fail": 9
+    "tests": 64,
+    "pass": 55,
+    "blocked": 9
   },
   "localSignatureImportSimulation": {
-    "tests": 3,
-    "pass": 3,
-    "fail": 0,
+    "tests": 4,
+    "pass": 4,
     "aiInference": false
   },
+  "requiredLinuxContractTests": 64,
   "linuxIsolationVerified": false,
   "kimiNativeCLIExecutionVerified": false,
-  "aiInferenceVerified": false,
   "cloudAIQualified": false,
-  "externalExecutionAuthorized": false,
-  "additionalRunsAuthorized": 0
+  "modelRereadRecovery": {
+    "maximumCorrectionRequests": 1,
+    "countsAgainstExistingRequestBudget": true,
+    "syntheticToolCalls": false,
+    "limitsIncreased": false
+  },
+  "previousRun": "38726412495"
 }

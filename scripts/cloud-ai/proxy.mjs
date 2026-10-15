@@ -1,14 +1,33 @@
 import {inferenceProfile,assertPromptBudget} from './inference-profile.mjs';
 import {validateGeneratedSource} from './source-policy.mjs';
 import http from 'node:http';import {randomUUID} from 'node:crypto';import {assertToolScope,sha} from './contract.mjs';
-export async function startInferenceProxy({emit,recordProtocol=async()=>{},sourceSnapshot=async()=>null,toolPolicy=async()=>({}),model='qwen3:1.7b',transport=async body=>{const r=await fetch('http://127.0.0.1:11434/v1/chat/completions',{method:'POST',redirect:'error',signal:AbortSignal.timeout(inferenceProfile(model).inferenceTimeoutMs),headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('ollama-http-'+r.status);const text=await r.text();if(Buffer.byteLength(text)>128000)throw Error('inference-response-too-large');return JSON.parse(text);},maximum=12}){
+export async function startInferenceProxy({emit,recordProtocol=async()=>{},sourceSnapshot=async()=>null,toolPolicy=async()=>({}),enforceRequiredRead=false,model='qwen3:1.7b',transport=async body=>{const r=await fetch('http://127.0.0.1:11434/v1/chat/completions',{method:'POST',redirect:'error',signal:AbortSignal.timeout(inferenceProfile(model).inferenceTimeoutMs),headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('ollama-http-'+r.status);const text=await r.text();if(Buffer.byteLength(text)>128000)throw Error('inference-response-too-large');return JSON.parse(text);},maximum=12}){
  const profile=inferenceProfile(model);maximum=Math.min(maximum,profile.maximumRequests);let count=0,busy=false;const server=http.createServer(async(req,res)=>{let owns=false;try{
   if(req.method!=='POST'||req.url!=='/v1/chat/completions'||busy||count>=maximum)throw Error('inference-route-or-budget');busy=true;owns=true;let bytes=0,text='';for await(const chunk of req){bytes+=chunk.length;if(bytes>128000)throw Error('inference-request-too-large');text+=chunk;}
   const b=JSON.parse(text);if(b.model!==model||!Array.isArray(b.messages)||b.messages.length>30||!Array.isArray(b.tools)||b.tools.length>3||b.tools.some(t=>t.type!=='function'||!['read','write','edit'].includes(t.function?.name)))throw Error('inference-tool-policy');
   if(b.max_tokens!==undefined&&(!Number.isInteger(b.max_tokens)||b.max_tokens<1||b.max_tokens>1024))throw Error('inference-output-budget');
-  const context=assertPromptBudget(b.messages,b.tools,profile);const requestID=randomUUID(),start=Date.now();count++;emit({type:'inference-start',requestID,requestSHA256:sha(b),number:count,context});
-  const body={model:b.model,messages:b.messages,tools:scopedInferenceTools(b.tools,{source:await sourceSnapshot(),...await toolPolicy()}),stream:false,max_tokens:profile.maxOutputTokens,temperature:profile.temperature,top_p:profile.topP,reasoning_effort:profile.reasoningEffort};assertPromptBudget(body.messages,body.tools,profile);
-  await recordProtocol({requestID,kind:'request',body});const reply=await transport(body);await recordProtocol({requestID,kind:'response',body:reply});const message=reply.choices?.[0]?.message;if(!message||message.role!=='assistant')throw Error('inference-response-schema');
+  assertPromptBudget(b.messages,b.tools,profile);const policy=await toolPolicy(),mustRead=enforceRequiredRead&&policy.requireRead===true;
+  const reminder={role:'user',content:'Verification is still pending. Your next action must be a native read tool call for /task/backend-limit.mjs. Passing tests do not complete this phase. Do not finish or edit again. The host will verify the actual read result.'};
+  const body={model:b.model,messages:mustRead?[...b.messages,reminder]:b.messages,tools:scopedInferenceTools(b.tools,{source:await sourceSnapshot(),...policy}),stream:false,max_tokens:profile.maxOutputTokens,temperature:profile.temperature,top_p:profile.topP,reasoning_effort:profile.reasoningEffort};
+  let reply,message,requestID,start;
+  for(let recovery=0;;recovery++){
+   if(count>=maximum)throw Error('inference-route-or-budget');
+   const context=assertPromptBudget(body.messages,body.tools,profile);requestID=randomUUID();start=Date.now();count++;emit({type:'inference-start',requestID,requestSHA256:sha(body),number:count,context});
+   await recordProtocol({requestID,kind:'request',body});reply=await transport(body);await recordProtocol({requestID,kind:'response',body:reply});message=reply.choices?.[0]?.message;if(!message||message.role!=='assistant')throw Error('inference-response-schema');
+   if(!mustRead)break;
+   const native=message.tool_calls??[];
+   if(native.length===1&&native[0].function?.name==='read'){
+    let args;try{args=JSON.parse(native[0].function.arguments);}catch{throw Error('required-source-reread-arguments');}
+    if(args.filePath!=='/task/backend-limit.mjs')throw Error('required-source-reread-target');break;
+   }
+   if(native.length)throw Error('required-source-reread-call');
+   emit({type:'inference-complete',requestID,durationMs:Date.now()-start,timings:reply.timings??null,responseSHA256:sha(reply),nativeCalls:0,usage:reply.usage??null});
+   emit({type:'required-source-reread-missing',requestID,recovery});
+   if(recovery>=1)throw Error('required-source-reread-missing');
+   // This is another real inference request, charged to the same request/phase budget.
+   // No tool call is synthesized, and discarded prose never reaches the CLI as completion.
+   body.messages.push(structuredClone(message),{...reminder,content:'Your last response did not call a tool. Verification is incomplete. Call the native read tool on /task/backend-limit.mjs now. This is the last correction opportunity.'});
+  }
   if(reply.choices?.[0]?.finish_reason==='length'&&!(message.tool_calls??[]).length){emit({type:'inference-truncated-without-native-call',requestID,usage:reply.usage??null});throw Error('inference-output-exhausted-without-native-call');}const calls=(message.tool_calls??[]).map(c=>({id:c.id,name:c.function?.name,arguments:c.function?.arguments}));assertToolScope(calls);
   // Content errors are tool results, not HTTP errors. Atomic native tools reject
   // invalid edits in OpenCode's conversation so inference can diagnose them.

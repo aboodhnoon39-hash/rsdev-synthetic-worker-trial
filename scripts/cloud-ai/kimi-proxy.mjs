@@ -7,7 +7,7 @@ import {normalizeKimiRequest,restoreKimiResponse} from './kimi-wire.mjs';
 export async function startKimiProxy({ledger,emit=()=>{},beforeRequest=async()=>{},...options}){
  if(typeof ledger!=='string'||!path.isAbsolute(ledger)||ledger.split(/[\\/]/).includes('..'))throw Error('kimi-absolute-ledger-required');
  fs.writeFileSync(ledger,'',{flag:'wx'});
- const backend=await startInferenceProxy({...options,emit:event=>{if(event.type==='native-call')fs.appendFileSync(ledger,JSON.stringify(event)+'\n');emit(event);}});
+ const backend=await startInferenceProxy({...options,enforceRequiredRead:true,emit:event=>{if(event.type==='native-call')fs.appendFileSync(ledger,JSON.stringify(event)+'\n');emit(event);}});
  const server=http.createServer(async(req,res)=>{try{
   if(req.method!=='POST'||req.url!=='/v1/chat/completions')throw Error('kimi-route-not-allowed');
   let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>128000)throw Error('kimi-request-too-large');}
