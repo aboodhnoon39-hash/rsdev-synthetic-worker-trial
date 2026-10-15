@@ -6,7 +6,7 @@ import {SOURCE,TEST,sha} from './contract.mjs';
 import {validateGeneratedSource} from './source-policy.mjs';
 
 // This executor accepts native tool arguments, never assistant text or shell commands.
-export function createAtomicTools({root='/task',history='/output/last-good',node='/usr/local/bin/node',emit=()=>{},beforeCommit=async()=>{}}={}) {
+export function createAtomicTools({root='/task',history='/output/last-good',node='/usr/local/bin/node',emit=()=>{},beforeCommit=async()=>{},allowedFunctions=['add','multiply']}={}) {
  let queue=Promise.resolve(),readHash=null,nodeVersion=null;const attempted=new Set();
  const serial=fn=>{const next=queue.then(fn);queue=next.catch(()=>{});return next;};
  async function scoped(filePath,writing=false){
@@ -39,6 +39,7 @@ export function createAtomicTools({root='/task',history='/output/last-good',node
    syntax(candidate);validateGeneratedSource(candidate);
    const functions=s=>Object.fromEntries([...s.matchAll(/export\s+function\s+(add|multiply)\s*\([^)]*\)\s*\{([^}]*)\}/g)].map(m=>[m[1],m[2]]));
    const before=functions(current),after=functions(candidate);if(Object.keys(before).filter(n=>before[n]!==after[n]).length!==1)throw Error('one-function-per-step: change one bug, then read and test');
+   if(Object.keys(before).some(n=>before[n]!==after[n]&&!allowedFunctions.includes(n)))throw Error('phase-function-not-allowed: preserve the other function for its diagnostic phase');
    const protectedBefore=sha(await fs.readFile(await scoped(TEST)));
    await fs.mkdir(history,{recursive:true});await fs.writeFile(path.join(history,sha(current)+'.mjs'),current,{flag:'wx'}).catch(e=>{if(e.code!=='EEXIST')throw e;});
    temp=path.join(root,'.candidate-'+randomUUID()+'.mjs');await fs.writeFile(temp,candidate,{flag:'wx'});
@@ -48,7 +49,7 @@ export function createAtomicTools({root='/task',history='/output/last-good',node
    // Fixed argv, protected tests, no model supplied command. Host Docker retest is authoritative.
    const r=spawnSync(node,['--test','--test-isolation=none','--test-reporter=tap',path.join(root,TEST)],{cwd:root,encoding:'utf8',timeout:5000,maxBuffer:60000,env:{PATH:path.dirname(node)}});
    emit({type:'atomic-commit',callID:context.callID,nodeVersion,beforeSHA256:sha(current),sourceSHA256:sha(candidate),testSHA256:protectedBefore,testExitCode:r.status,tap:r.stdout,automaticMerge:false});
-   return JSON.stringify({status:'committed-pending-review',nodeVersion,sourceSHA256:sha(candidate),testExitCode:r.status,tap:r.stdout,error:r.stderr||r.error?.message||null,next:'Read current source again. Copy the complete exact target function from that read before a different edit; diagnose these actual test failures.',signedSuccess:false,automaticMerge:false});
+   return JSON.stringify({status:'committed-pending-review',nodeVersion,sourceSHA256:sha(candidate),testExitCode:r.status,tap:r.stdout,error:r.stderr||r.error?.message||null,next:'Your next action MUST be native read of /task/backend-limit.mjs, even when tests pass. After reading, end this phase; do not modify another function. The host schedules any remaining diagnostic phase.',signedSuccess:false,automaticMerge:false});
   }catch(e){emit({type:'atomic-rejected',callID:context.callID,name,reason:e.message,fingerprint,unchanged:true});throw e;}finally{if(temp)await fs.unlink(temp).catch(()=>{});}
  });return {execute};
 }
