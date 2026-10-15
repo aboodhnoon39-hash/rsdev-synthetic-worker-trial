@@ -1,3 +1,4 @@
+import {summarizeFailureTAP} from "./phase-progress.mjs";
 import fs from 'node:fs/promises';import path from 'node:path';import {pathToFileURL} from 'node:url';import {createAtomicTools} from './atomic-tools.mjs';
 import {claimKimiCall} from './kimi-wire.mjs';
 export const KIMI_ATOMIC_TOOLS=['read','edit','write'];
@@ -21,7 +22,7 @@ export function createKimiAtomicMCP({root,history,node=process.execPath,emit=()=
    if(Object.keys(args).some(k=>!Object.hasOwn(schema.properties,k))||schema.required.some(k=>typeof args[k]!=='string'))throw Error('tool-arguments-invalid');
    emit({type:'mcp-native-tool-request',id:request.id,name,arguments:args});
    const callID=await resolveCall(request,name,args);
-   try{const content=await executor.execute(name,args,{callID});result={content:[{type:'text',text:content}],isError:false};}catch(e){result={content:[{type:'text',text:e.message}],isError:true};}
+   try{let content=await executor.execute(name,args,{callID});if(name!=='read'){const value=JSON.parse(content);const diagnostics=summarizeFailureTAP(value.tap);delete value.tap;content=JSON.stringify({...value,diagnostics,fullTAPEvidence:'atomic-commit event'});}result={content:[{type:'text',text:content}],isError:false};}catch(e){result={content:[{type:'text',text:e.message}],isError:true};}
    emit({type:'tool-event',tool:name,callID,status:result.isError?'error':'completed',input:args,...(result.isError?{error:result.content[0].text}:{output:result.content[0].text})});
   }else throw Error('mcp-method-not-allowed');
   return {jsonrpc:'2.0',id:request.id,result};
@@ -35,6 +36,6 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
  const claimed=[];
  const resolveCall=async(request,name,args)=>{const records=(await fs.readFile('/cache/kimi-native-calls.jsonl','utf8')).split('\n').filter(Boolean).map(JSON.parse),row=claimKimiCall(records,claimed,name,args);claimed.push(row.id);emit({type:'kimi-mcp-call-linked',transportID:request.id,callID:row.id,requestID:row.requestID});return row.id;};
  const handle=createKimiAtomicMCP({root:'/task',history:'/output/last-good',emit,allowedFunctions:phase.allowedFunctions??[],resolveCall});let pending='',requests=Promise.resolve();
- process.stdin.on('data',chunk=>{pending+=chunk;if(Buffer.byteLength(pending)>262144){process.exitCode=1;process.stdin.destroy();return;}const lines=pending.split('\n');pending=lines.pop();for(const line of lines.filter(Boolean))requests=requests.then(async()=>{let request;try{request=JSON.parse(line);const reply=await handle(request);if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}catch(e){process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request?.id??null,error:{code:-32600,message:e.message}})+'\n');}});});
+ process.stdin.on('data',chunk=>{pending+=chunk;if(Buffer.byteLength(pending)>262144){process.exitCode=1;process.stdin.destroy();return;}const lines=pending.split('\n');pending=lines.pop();for(const line of lines.filter(Boolean))requests=requests.then(async()=>{let request;try{request=JSON.parse(line);const reply=await handle(request);await queue;if(reply)process.stdout.write(JSON.stringify(reply)+'\n');}catch(e){process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request?.id??null,error:{code:-32600,message:e.message}})+'\n');}});});
  process.stdin.on('end',()=>{requests.then(()=>queue).catch(()=>{process.exitCode=1;});});
 }

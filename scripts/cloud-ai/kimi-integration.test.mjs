@@ -44,7 +44,7 @@ test('two Kimi MCP phases enforce scope, protected tests and correlated completi
    assert.equal(await fs.readFile(path.join(root,'backend-limit.mjs'),'utf8'),before);
   }
   const edited=await call('edit',edit);assert.equal(edited.result.isError,false,content(edited));
-  const receipt=JSON.parse(content(edited)),counts=assertTap(receipt.tap,{passing:expectedPass===6});
+  const receipt=JSON.parse(content(edited)),counts=assertTap(events.findLast(e=>e.type==='atomic-commit').tap,{passing:expectedPass===6});
   assert.equal(counts.pass,expectedPass);assert.equal(receipt.testExitCode,expectedPass===6?0:1);
   assert.equal(completedNativePhase(events),false);
   await call('read',{filePath:testFile});assert.equal(completedNativePhase(events),false);

@@ -6,8 +6,8 @@
   "localCompletePathVerified": false,
   "hostSubprocessBlock": "spawn EPERM",
   "hostContractTests": {
-    "tests": 55,
-    "pass": 46,
+    "tests": 57,
+    "pass": 48,
     "fail": 9
   },
   "localSignatureImportSimulation": {
