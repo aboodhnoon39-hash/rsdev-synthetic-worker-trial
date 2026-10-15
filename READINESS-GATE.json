@@ -1,5 +1,6 @@
 {
-  "status": "LOCAL REPAIR VERIFIED - CLOUD TRIAL AWAITS SPECIFIC APPROVAL",
+  "status": "READY FOR KIMI GATED TRIAL",
+  "reviewStage": "Awaiting specific approval for corrected package",
   "externalExecutionAuthorized": false,
   "additionalRunsAuthorized": 0,
   "localSecurityReviewed": true,
@@ -8,8 +9,8 @@
   "requiresExplicitConsentToLinuxSubstitution": true,
   "hostSubprocessBlock": "spawn EPERM",
   "hostContractTests": {
-    "tests": 64,
-    "pass": 55,
+    "tests": 69,
+    "pass": 60,
     "blocked": 9
   },
   "localSignatureImportSimulation": {
@@ -17,7 +18,7 @@
     "pass": 4,
     "aiInference": false
   },
-  "requiredLinuxContractTests": 64,
+  "requiredLinuxContractTests": 69,
   "linuxIsolationVerified": false,
   "kimiNativeCLIExecutionVerified": false,
   "cloudAIQualified": false,
@@ -27,5 +28,5 @@
     "syntheticToolCalls": false,
     "limitsIncreased": false
   },
-  "previousRun": "38726412495"
+  "previousRun": "38731652959"
 }
