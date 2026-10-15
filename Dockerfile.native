@@ -3,8 +3,11 @@ ARG PYTHON_IMAGE
 FROM ${PYTHON_IMAGE} AS python_runtime
 FROM ${NODE_IMAGE}
 COPY --from=python_runtime /usr/local/ /usr/local/
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libssl.so.3
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libcrypto.so.3 /usr/lib/x86_64-linux-gnu/libcrypto.so.3
 COPY vendor/wheels/ /wheels/
 RUN ldconfig && python3.12 -m pip install --no-index --no-deps --target /opt/openhands /wheels/*.whl
+RUN HOME=/tmp PYTHONPATH=/opt/openhands LITELLM_LOCAL_MODEL_COST_MAP=True OTEL_SDK_DISABLED=true DO_NOT_TRACK=1 python3.12 -c "import ssl, bz2, lzma, sqlite3, ctypes; from openhands.sdk import Agent, LLM, Conversation; from importlib.metadata import version; assert version('openhands-sdk') == '1.54.0'; print(ssl.OPENSSL_VERSION)"
 COPY vendor/codex/codex /opt/codex/codex
 COPY scripts/ /worker/
 ENV PYTHONPATH=/opt/openhands
