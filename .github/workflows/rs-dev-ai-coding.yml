@@ -1,4 +1,4 @@
-name: RS-Dev first real AI coding trial
+name: RS-Dev isolated Kimi qualification trial
 on:
   workflow_dispatch:
     inputs:
@@ -19,13 +19,14 @@ concurrency:
   cancel-in-progress: false
 jobs:
   isolated-ai:
-    if: inputs.approved && vars.RS_AI_CODING_ENABLED == 'yes' && vars.RS_ZERO_SPEND_VERIFIED == 'yes' && inputs.approval_id == vars.RS_AI_APPROVAL_ID
+    if: inputs.approved && vars.RS_AI_CODING_ENABLED == 'yes' && vars.RS_ZERO_SPEND_VERIFIED == 'yes' && vars.RS_KIMI_LINUX_SUBSTITUTE_APPROVED == 'yes' && inputs.approval_id == vars.RS_AI_APPROVAL_ID
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       RS_AI_EXECUTION_AUTHORIZED: 'yes'
       RS_ZERO_SPEND_VERIFIED: ${{ vars.RS_ZERO_SPEND_VERIFIED }}
       RS_EXPECTED_AI_PACKET_SHA256: ${{ inputs.packet_sha256 }}
+      RS_KIMI_LINUX_SUBSTITUTE_APPROVED: ${{ vars.RS_KIMI_LINUX_SUBSTITUTE_APPROVED }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -35,6 +36,8 @@ jobs:
           node-version: '24.19.0'
       - name: Validate authorization, exact packet and resources before downloads
         run: node scripts/cloud-ai/preflight.mjs
+      - name: Exercise contract tests with actual Linux subprocesses before runtime or model downloads
+        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/cloud-ai/*.test.mjs > KIMI-LINUX-CONTRACTS.tap
       - name: Stage one - download pinned official CPU tools only
         run: node scripts/cloud-ai/download-runtime.mjs --runtime
       - name: Fetch approved pinned Node runtime before isolation
@@ -65,6 +68,7 @@ jobs:
         with:
           name: rs-ai-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            KIMI-LINUX-CONTRACTS.tap
             DOWNLOAD-*-MEASUREMENTS.json
             DOWNLOAD-*-FAILURE.json
             RESOURCE-PREFLIGHT.json
@@ -92,6 +96,10 @@ jobs:
             trial-ai/TESTS-*.tap
             trial-ai/FAILURE.json
             trial-ai/BUILD.log
+            trial-ai/isolation/output/KIMI-*.json
+            trial-ai/isolation/output/KIMI-*.jsonl
+            trial-ai/native-probe/output/KIMI-*.jsonl
+            trial-ai/phase-*/output/KIMI-*.jsonl
             trial-ai/phase-*/TRACE.jsonl
             trial-ai/phase-*/STDERR.log
             trial-ai/phase-*/output/PARTIAL-CHECKPOINT.json

@@ -1,1 +1,25 @@
-{"status":"READY FOR FIRST REAL AI RUN","localSecurityReviewed":true,"requiresGitHubStageOne":true,"linuxIsolationVerified":false,"aiInferenceVerified":true,"localOnlyInference":true,"externalExecutionAuthorized":true,"additionalRunsAuthorized":0}
+{
+  "status": "READY FOR KIMI GATED TRIAL",
+  "localSecurityReviewed": true,
+  "requiresGitHubStageOne": true,
+  "requiresExplicitConsentToLinuxSubstitution": true,
+  "localCompletePathVerified": false,
+  "hostSubprocessBlock": "spawn EPERM",
+  "hostContractTests": {
+    "tests": 55,
+    "pass": 46,
+    "fail": 9
+  },
+  "localSignatureImportSimulation": {
+    "tests": 3,
+    "pass": 3,
+    "fail": 0,
+    "aiInference": false
+  },
+  "linuxIsolationVerified": false,
+  "kimiNativeCLIExecutionVerified": false,
+  "aiInferenceVerified": false,
+  "cloudAIQualified": false,
+  "externalExecutionAuthorized": false,
+  "additionalRunsAuthorized": 0
+}

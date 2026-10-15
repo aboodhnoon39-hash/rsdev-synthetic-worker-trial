@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
+import {startKimiProxy} from './kimi-proxy.mjs';import {claimKimiCall} from './kimi-wire.mjs';
+test('actual loopback Kimi bridge preserves native ids through canonical policy and durable ledger (mock model)',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'kimi-bridge-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const ledger=path.join(dir,'calls.jsonl'),events=[];let seen;
+ const proxy=await startKimiProxy({ledger,model:'qwen3:4b',maximum:1,emit:e=>events.push(e),transport:async request=>{seen=request;return {id:'actual-mock-response-id',created:123,model:request.model,choices:[{message:{role:'assistant',content:null,tool_calls:[{id:'model-tool-17',type:'function',function:{name:'read',arguments:JSON.stringify({filePath:'/task/backend-limit.mjs'})}}]},finish_reason:'tool_calls'}]};}});t.after(()=>proxy.close());
+ const body={model:'qwen3:4b',stream:true,messages:[{role:'user',content:'mock protocol only'}],tools:[{type:'function',function:{name:'mcp__rsdev__read',description:'read',parameters:{type:'object',properties:{filePath:{type:'string'}},required:['filePath']}}}]};
+ const response=await fetch('http://127.0.0.1:'+proxy.port+'/v1/chat/completions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});assert.equal(response.status,200);const stream=await response.text();assert.match(stream,/actual-mock-response-id/);assert.match(stream,/mcp__rsdev__read/);assert.match(stream,/model-tool-17/);assert.equal(seen.tools[0].function.name,'read');assert.equal(proxy.count(),1);
+ const records=(await fs.readFile(ledger,'utf8')).trim().split('\n').map(JSON.parse);assert.equal(claimKimiCall(records,[],'read',{filePath:'/task/backend-limit.mjs'}).id,'model-tool-17');assert.equal(records[0].requestID,events.find(e=>e.type==='inference-complete').requestID);
+ const denied=await fetch('http://127.0.0.1:'+proxy.port+'/v1/chat/completions',{method:'POST',body:JSON.stringify(body)});assert.equal(denied.status,403);assert.equal((await fs.readFile(ledger,'utf8')).trim().split('\n').length,1);
+});
+test('assistant JSON text creates no model call record (mock model)',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'kimi-no-call-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const ledger=path.join(dir,'calls.jsonl');
+ const proxy=await startKimiProxy({ledger,model:'qwen3:4b',emit:()=>{},transport:async()=>({id:'text-only',model:'qwen3:4b',choices:[{message:{role:'assistant',content:'{"name":"write"}'},finish_reason:'stop'}]})});t.after(()=>proxy.close());
+ const r=await fetch('http://127.0.0.1:'+proxy.port+'/v1/chat/completions',{method:'POST',body:JSON.stringify({model:'qwen3:4b',messages:[{role:'user',content:'mock'}],tools:[{type:'function',function:{name:'mcp__rsdev__read',parameters:{type:'object',properties:{filePath:{type:'string'}}}}}]})});assert.equal(r.status,200);await r.text();assert.equal(await fs.readFile(ledger,'utf8'),'');
+});
