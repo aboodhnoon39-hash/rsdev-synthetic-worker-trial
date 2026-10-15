@@ -1,4 +1,4 @@
-name: RS-Dev isolated Codex qualification trial
+name: RS-Dev isolated OpenHands qualification trial
 on:
   workflow_dispatch:
     inputs:
@@ -37,15 +37,17 @@ jobs:
       - name: Validate authorization, exact packet and resources before downloads
         run: node scripts/cloud-ai/preflight.mjs
       - name: Exercise contract tests with actual Linux subprocesses before runtime or model downloads
-        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/cloud-ai/*.test.mjs > CODEX-LINUX-CONTRACTS.tap
+        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/cloud-ai/*.test.mjs > OPENHANDS-LINUX-CONTRACTS.tap
       - name: Stage one - download pinned official CPU tools only
         run: node scripts/cloud-ai/download-runtime.mjs --runtime
-      - name: Fetch pinned official Codex runtime
-        run: python3 scripts/download-codex-runtime.py
+      - name: Fetch pinned official OpenHands wheels
+        run: python3 scripts/download-openhands-runtime.py
       - name: Verify remaining native protocol adapter contracts
-        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/model-bridge.test.mjs scripts/codex-parallel-history.test.mjs scripts/required-progress.test.mjs > CODEX-NATIVE-BRIDGE.tap
+        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/model-bridge.test.mjs scripts/codex-parallel-history.test.mjs scripts/required-progress.test.mjs > OPENHANDS-NATIVE-BRIDGE.tap
       - name: Fetch approved pinned Node runtime before isolation
         run: docker pull "$(node -p 'JSON.parse(require("fs").readFileSync("RUNTIME-LOCK.json")).nodeImage')"
+      - name: Fetch pinned Python base image
+        run: docker pull "$(node -p 'JSON.parse(require("fs").readFileSync("pins/PYTHON-IMAGE-PIN.json")).image')"
       - name: Stage one - verify Linux isolation, OpenCode permissions and resources without inference
         id: linux-gate
         run: node scripts/cloud-ai/prepare-linux.mjs
@@ -72,9 +74,11 @@ jobs:
         with:
           name: rs-ai-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            CODEX-LINUX-CONTRACTS.tap
-            CODEX-NATIVE-BRIDGE.tap
-            DOWNLOAD-CODEX-PROOF.json
+            OPENHANDS-LINUX-CONTRACTS.tap
+            OPENHANDS-NATIVE-BRIDGE.tap
+            DOWNLOAD-OPENHANDS-PROOF.json
+            trial-ai/native-probe/output/OPENHANDS-SDK-EVENTS.json
+            trial-ai/phase-*/output/OPENHANDS-SDK-EVENTS.json
             trial-ai/native-probe/output/NATIVE-*.jsonl
             trial-ai/native-probe/output/NATIVE-*.log
             trial-ai/phase-*/output/NATIVE-*.jsonl

@@ -1,10 +1,31 @@
 ARG NODE_IMAGE
+ARG PYTHON_IMAGE
+FROM ${PYTHON_IMAGE} AS python_runtime
 FROM ${NODE_IMAGE}
+COPY --from=python_runtime /usr/local/ /usr/local/
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libcrypto.so.3 /usr/lib/x86_64-linux-gnu/libcrypto.so.3
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libgdbm.so.6.0.0 /usr/lib/x86_64-linux-gnu/libgdbm.so.6
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2.2 /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libk5crypto.so.3.1 /usr/lib/x86_64-linux-gnu/libk5crypto.so.3
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libkeyutils.so.1.10 /usr/lib/x86_64-linux-gnu/libkeyutils.so.1
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libkrb5.so.3.3 /usr/lib/x86_64-linux-gnu/libkrb5.so.3
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libkrb5support.so.0.1 /usr/lib/x86_64-linux-gnu/libkrb5support.so.0
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libncursesw.so.6.4 /usr/lib/x86_64-linux-gnu/libncursesw.so.6
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libnsl.so.2.0.1 /usr/lib/x86_64-linux-gnu/libnsl.so.2
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libpanelw.so.6.4 /usr/lib/x86_64-linux-gnu/libpanelw.so.6
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libreadline.so.8.2 /usr/lib/x86_64-linux-gnu/libreadline.so.8
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libsqlite3.so.0.8.6 /usr/lib/x86_64-linux-gnu/libsqlite3.so.0
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libssl.so.3
+COPY --from=python_runtime /usr/lib/x86_64-linux-gnu/libtirpc.so.3.0.0 /usr/lib/x86_64-linux-gnu/libtirpc.so.3
+COPY vendor/wheels/ /wheels/
+RUN ldconfig && python3.12 -m pip install --no-index --no-deps --target /opt/openhands /wheels/*.whl
+RUN HOME=/tmp PYTHONPATH=/opt/openhands LITELLM_LOCAL_MODEL_COST_MAP=True OTEL_SDK_DISABLED=true python3.12 -c "import ssl,sqlite3; from openhands.sdk import Agent,LLM,Conversation; from importlib.metadata import version; assert version('openhands-sdk')=='1.54.0'"
 COPY vendor/ollama/ /usr/local/
 COPY vendor/opencode/opencode /usr/local/bin/opencode
-COPY vendor/codex/codex /opt/codex/codex
 COPY scripts/cloud-ai/ /worker/
 COPY scripts/ /worker/
+ENV PYTHONPATH=/opt/openhands
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV XDG_CONFIG_HOME=/worker/offline-config
 ENV LD_LIBRARY_PATH=/usr/local/lib/ollama
 USER 65534:65534
