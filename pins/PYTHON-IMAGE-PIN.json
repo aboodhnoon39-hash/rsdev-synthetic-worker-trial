@@ -1,9 +1,0 @@
-{
-  "image": "python@sha256:1aaa65a85fda306ffb8b910824d4e93bdce61e212c7e87168123ea3073b41a1a",
-  "tagObserved": "3.12.14-slim-bookworm",
-  "indexDigest": "sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e",
-  "platform": "linux/amd64",
-  "pythonVersion": "3.12.14",
-  "officialRegistry": "registry-1.docker.io/library/python",
-  "pulledOrExecuted": false
-}
