@@ -43,7 +43,7 @@ jobs:
       - name: Fetch pinned official Codex runtime
         run: python3 scripts/download-codex-runtime.py
       - name: Verify remaining native protocol adapter contracts
-        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/model-bridge.test.mjs scripts/codex-parallel-history.test.mjs > CODEX-NATIVE-BRIDGE.tap
+        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/model-bridge.test.mjs scripts/codex-parallel-history.test.mjs scripts/required-progress.test.mjs > CODEX-NATIVE-BRIDGE.tap
       - name: Fetch approved pinned Node runtime before isolation
         run: docker pull "$(node -p 'JSON.parse(require("fs").readFileSync("RUNTIME-LOCK.json")).nodeImage')"
       - name: Stage one - verify Linux isolation, OpenCode permissions and resources without inference

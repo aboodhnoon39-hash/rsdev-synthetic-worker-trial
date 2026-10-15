@@ -36,3 +36,20 @@ test('Codex Responses preserves native call identity and namespace',async()=>fix
 test('the same request budget bounds successive model requests',async()=>fixture(async(root,start)=>{
  const b=await start({maximum:1,transport:async()=>reply()});assert.equal((await post(b,'/v1/chat/completions',request())).status,200);assert.equal((await post(b,'/v1/chat/completions',request())).status,403);assert.equal(b.count(),1);
 }));
+test('recorded no-op then reread then false-success path requires a counted native correction',async()=>fixture(async(root,start)=>{
+ let turn=0;const sent=[];
+ const b=await start({maximum:6,transport:async request=>{sent.push(request);turn++;
+  if(turn===1){const response=reply('read',{filePath:'/task/backend-limit.mjs'},'source-read');response.choices[0].message.tool_calls.push(reply('read',{filePath:'/task/backend-limit.test.mjs'},'test-read').choices[0].message.tool_calls[0]);return response;}
+  if(turn===2)return reply('edit',{filePath:'/task/backend-limit.mjs',oldString:'export function add(a, b) { return a - b; }',newString:'export function add(a, b) { return a - b; }'},'rejected-noop');
+  if(turn===3)return reply('read',{filePath:'/task/backend-limit.mjs'},'fresh-read');
+  if(turn===4)return {choices:[{message:{role:'assistant',content:'The unchanged source completed the operation successfully.'},finish_reason:'stop'}]};
+  return reply('edit',{filePath:'/task/backend-limit.mjs',oldString:'export function add(a, b) { return a - b; }',newString:'export function add(a, b) { return a - b + 0; }'},'real-correction-call');
+ }});
+ const call=async(name,args,id)=>post(b,'/mcp',{jsonrpc:'2.0',id,method:'tools/call',params:{name,arguments:args}});
+ assert.equal((await post(b,'/v1/chat/completions',request())).status,200);
+ await call('read',{filePath:'/task/backend-limit.mjs'},1);await call('read',{filePath:'/task/backend-limit.test.mjs'},2);
+ await post(b,'/v1/chat/completions',request());const rejected=await call('edit',{filePath:'/task/backend-limit.mjs',oldString:'export function add(a, b) { return a - b; }',newString:'export function add(a, b) { return a - b; }'},3);assert.equal((await rejected.json()).result.isError,true);
+ await post(b,'/v1/chat/completions',request());await call('read',{filePath:'/task/backend-limit.mjs'},4);
+ const correction=await post(b,'/v1/chat/completions',request());assert.equal(correction.status,200);assert.equal((await correction.json()).choices[0].message.tool_calls[0].id,'real-correction-call');
+ assert.deepEqual(sent.map(body=>body.tools.map(t=>t.function.name)),[['read','edit','write'],['edit','write'],['read'],['edit','write'],['edit','write']]);assert.equal(b.count(),5);assert.equal(b.events.some(e=>e.type==='atomic-commit'),false);assert.equal(await fs.readFile(path.join(root,'backend-limit.mjs'),'utf8'),cloudAIFiles['backend-limit.mjs']);
+}));

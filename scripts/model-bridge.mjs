@@ -35,10 +35,10 @@ export async function startModelBridge({provider,root,history,allowedFunctions,e
  const handle=createKimiAtomicMCP({root,history,allowedFunctions,emit:report,resolveCall:async(request,name,args)=>{
   const row=claimKimiCall(ledger,claimed,name,args);claimed.push(row.id);report({type:'native-call-linked',callID:row.id,transportID:request.id,requestID:row.requestID});return row.id;
  }});
- const backend=await startInferenceProxy({model:'qwen3:4b',maximum,enforceRequiredRead:true,emit:report,recordProtocol,...(mock?{transport}:{}),sourceSnapshot:async()=>{
+ const backend=await startInferenceProxy({model:'qwen3:4b',maximum,enforceRequiredRead:true,enforceRequiredWrite:true,emit:report,recordProtocol,...(mock?{transport}:{}),sourceSnapshot:async()=>{
   const read=events.findLast(e=>e.type==='atomic-read'&&e.filePath==='/task/backend-limit.mjs');if(!read)return null;
   const source=await fs.readFile(root+'/backend-limit.mjs','utf8');return read.hash===sha(source)?source:null;
- },toolPolicy:async()=>({allowedFunctions,requireRead:events.findLastIndex(e=>e.type==='atomic-commit')>events.findLastIndex(e=>e.type==='atomic-read'&&e.filePath==='/task/backend-limit.mjs')})});
+ },toolPolicy:async()=>{const read=events.findLastIndex(e=>e.type==='atomic-read'&&e.filePath==='/task/backend-limit.mjs'),rejected=events.findLastIndex(e=>e.type==='atomic-rejected'),committed=events.findLastIndex(e=>e.type==='atomic-commit'),testsRead=events.some(e=>e.type==='atomic-read'&&e.filePath==='/task/backend-limit.test.mjs');return {allowedFunctions,requireRead:Math.max(rejected,committed)>read,requireWrite:committed<0&&read>=0&&testsRead&&rejected<=read};}});
  const sockets=new Set();let closed=false;
  const server=http.createServer(async(req,res)=>{try{
   if(req.method==='GET'){res.writeHead(405);return res.end();}
