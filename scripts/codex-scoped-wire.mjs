@@ -19,7 +19,12 @@ export function codexScopedRequest(body){
   if((item.type??'message')==='message'){
    if(!['user','assistant','system','developer'].includes(item.role))throw Error('codex-message-role');const content=typeof item.content==='string'?item.content:item.content?.map(c=>{if(!['input_text','output_text'].includes(c.type)||typeof c.text!=='string')throw Error('codex-text-only');return c.text;}).join('\n');if(typeof content!=='string')throw Error('codex-message-content');messages.push({role:item.role==='developer'?'system':item.role,content});
   }else if(item.type==='function_call'){
-   if(item.namespace!==namespace||typeof item.call_id!=='string'||!item.call_id||pending.has(item.call_id))throw Error('codex-call-identity');check(item.name,item.arguments);pending.set(item.call_id,item.name);messages.push({role:'assistant',content:null,tool_calls:[{id:item.call_id,type:'function',function:{name:item.name,arguments:item.arguments}}]});
+   if(item.namespace!==namespace||typeof item.call_id!=='string'||!item.call_id||pending.has(item.call_id))throw Error('codex-call-identity');check(item.name,item.arguments);pending.set(item.call_id,item.name);
+   const call={id:item.call_id,type:'function',function:{name:item.name,arguments:item.arguments}},last=messages.at(-1);
+   // Responses emits each parallel function call as a separate item. Chat
+   // requires one assistant turn containing the full set of parallel calls.
+   if(last?.role==='assistant'&&Array.isArray(last.tool_calls))last.tool_calls.push(call);
+   else messages.push({role:'assistant',content:null,tool_calls:[call]});
   }else if(item.type==='function_call_output'){
    if(!pending.has(item.call_id))throw Error('codex-unmatched-result');pending.delete(item.call_id);messages.push({role:'tool',tool_call_id:item.call_id,content:typeof item.output==='string'?item.output:JSON.stringify(item.output)});
   }else if(item.type==='reasoning'){

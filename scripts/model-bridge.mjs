@@ -53,7 +53,7 @@ export async function startModelBridge({provider,root,history,allowedFunctions,e
   if(req.url!==(provider==='codex'?'/v1/responses':'/v1/chat/completions'))throw Error('native-route-policy');
   if(phaseCompleted)throw Error('native-phase-already-complete');
   const request=provider==='codex'?codexScopedRequest(body):openhandsScopedRequest(body);
-  const response=await fetch('http://127.0.0.1:'+backend.port+'/v1/chat/completions',{method:'POST',redirect:'error',headers:{'content-type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(125000)});
+  const response=await fetch('http://127.0.0.1:'+backend.port+'/v1/chat/completions',{method:'POST',redirect:'error',headers:{'content-type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(185000)});
   if(!response.ok)throw Error('model-proxy-rejected:'+await response.text());
   const reply=await response.json();
   if(provider==='codex'){res.writeHead(200,{'content-type':'text/event-stream'});res.end(codexScopedResponse(reply,{requestID:randomUUID()}).stream);}
