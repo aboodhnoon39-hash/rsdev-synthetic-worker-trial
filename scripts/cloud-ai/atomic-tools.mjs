@@ -3,7 +3,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 import {SOURCE,TEST,sha} from './contract.mjs';
-import {validateGeneratedSource} from './source-policy.mjs';
+import {scopedFunctions,functionBodies,validateGeneratedSource} from './source-policy.mjs';
 
 // This executor accepts native tool arguments, never assistant text or shell commands.
 export function createAtomicTools({root='/task',history='/output/last-good',node='/usr/local/bin/node',emit=()=>{},beforeCommit=async()=>{},allowedFunctions=['add','multiply']}={}) {
@@ -29,7 +29,7 @@ export function createAtomicTools({root='/task',history='/output/last-good',node
     if(typeof args.oldString!=='string'||!args.oldString.length||typeof args.newString!=='string')throw Error('edit-arguments-invalid');
     if(args.oldString===args.newString)throw Error('no-op: oldString and newString are identical');
     const count=current.split(args.oldString).length-1;if(count!==1){readHash=null;throw Error('oldString-mismatch-or-ambiguous: '+count+' exact matches; read the current source again and use the COMPLETE exact exported target function as oldString');}
-    const completeFunctions=[...current.matchAll(/export\s+function\s+(?:add|multiply)\s*\([^)]*\)\s*\{[^}]*\}/g)].map(m=>m[0]);
+    const completeFunctions=scopedFunctions(current);
     if(!completeFunctions.includes(args.oldString)){readHash=null;throw Error('full-function-oldString-required: read the current source again; copy the COMPLETE exact exported target function, not a shared return expression');}
     candidate=current.replace(args.oldString,args.newString);
    }else candidate=args.content;
@@ -38,7 +38,7 @@ export function createAtomicTools({root='/task',history='/output/last-good',node
    if(!nodeVersion){const version=spawnSync(node,['--version'],{encoding:'utf8',timeout:5000,env:{PATH:path.dirname(node)}}),actualVersion=version.stdout?.trim();if(version.status!==0||!/^v24\./.test(actualVersion??''))throw Error('executor-node24-required');nodeVersion=actualVersion;}
    syntax(candidate);validateGeneratedSource(candidate);
    const functions=s=>Object.fromEntries([...s.matchAll(/export\s+function\s+(add|multiply)\s*\([^)]*\)\s*\{([^}]*)\}/g)].map(m=>[m[1],m[2]]));
-   const before=functions(current),after=functions(candidate);if(Object.keys(before).filter(n=>before[n]!==after[n]).length!==1)throw Error('one-function-per-step: change one bug, then read and test');
+   const before=functionBodies(current),after=functionBodies(candidate);if(Object.keys(before).filter(n=>before[n]!==after[n]).length!==1)throw Error('one-function-per-step: change one bug, then read and test');
    if(Object.keys(before).some(n=>before[n]!==after[n]&&!allowedFunctions.includes(n)))throw Error('phase-function-not-allowed: preserve the other function for its diagnostic phase');
    const protectedBefore=sha(await fs.readFile(await scoped(TEST)));
    await fs.mkdir(history,{recursive:true});await fs.writeFile(path.join(history,sha(current)+'.mjs'),current,{flag:'wx'}).catch(e=>{if(e.code!=='EEXIST')throw e;});

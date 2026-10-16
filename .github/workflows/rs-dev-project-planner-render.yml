@@ -1,0 +1,189 @@
+name: RS-Dev real project planner and encrypted render trial
+on:
+  workflow_dispatch:
+    inputs:
+      approved:
+        type: boolean
+        default: false
+        required: true
+      packet_sha256:
+        type: string
+        required: true
+      approval_id:
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: rs-dev-project-planner-render
+  cancel-in-progress: false
+jobs:
+  isolated-ai:
+    if: inputs.approved && vars.RS_AI_CODING_ENABLED == 'yes' && vars.RS_ZERO_SPEND_VERIFIED == 'yes' && vars.RS_REMAINING_LINUX_SUBSTITUTE_APPROVED == 'yes' && inputs.approval_id == vars.RS_AI_APPROVAL_ID
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      RS_AI_EXECUTION_AUTHORIZED: 'yes'
+      RS_ZERO_SPEND_VERIFIED: ${{ vars.RS_ZERO_SPEND_VERIFIED }}
+      RS_EXPECTED_AI_PACKET_SHA256: ${{ inputs.packet_sha256 }}
+      RS_REMAINING_LINUX_SUBSTITUTE_APPROVED: ${{ vars.RS_REMAINING_LINUX_SUBSTITUTE_APPROVED }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.19.0'
+      - name: Validate authorization, exact packet and resources before downloads
+        run: node scripts/cloud-ai/preflight.mjs
+      - name: Exercise contract tests with actual Linux subprocesses before runtime or model downloads
+        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/cloud-ai/*.test.mjs > OPENHANDS-LINUX-CONTRACTS.tap
+      - name: Stage one - download pinned official CPU tools only
+        run: node scripts/cloud-ai/download-runtime.mjs --runtime
+      - name: Fetch pinned official OpenHands wheels
+        run: python3 scripts/download-openhands-runtime.py
+      - name: Verify remaining native protocol adapter contracts
+        run: node --test --test-isolation=none --test-concurrency=1 --test-reporter=tap scripts/model-bridge.test.mjs scripts/codex-parallel-history.test.mjs scripts/required-progress.test.mjs > OPENHANDS-NATIVE-BRIDGE.tap
+      - name: Fetch approved pinned Node runtime before isolation
+        run: docker pull "$(node -p 'JSON.parse(require("fs").readFileSync("RUNTIME-LOCK.json")).nodeImage')"
+      - name: Fetch pinned Python base image
+        run: docker pull "$(node -p 'JSON.parse(require("fs").readFileSync("pins/PYTHON-IMAGE-PIN.json")).image')"
+      - name: Stage one - verify Linux isolation, OpenCode permissions and resources without inference
+        id: linux-gate
+        run: node scripts/cloud-ai/prepare-linux.mjs
+      - name: Stage two - download pinned model only after the Linux gate passes
+        if: success() && steps.linux-gate.outcome == 'success'
+        run: node scripts/cloud-ai/download-runtime.mjs --model
+      - name: Plan the actual project task with the real pinned model
+        run: node scripts/cloud-ai/run-project-planner.mjs
+      - name: Execute the bounded plan with native tools and independent protected tests
+        run: node scripts/cloud-ai/run-linux.mjs
+      - name: Save untrusted successful result for separate signing job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rs-ai-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: trial-ai/AI-RESULT.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Preserve bounded resource and stop diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rs-ai-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            OPENHANDS-LINUX-CONTRACTS.tap
+            OPENHANDS-NATIVE-BRIDGE.tap
+            DOWNLOAD-OPENHANDS-PROOF.json
+            trial-ai/native-probe/output/OPENHANDS-SDK-EVENTS.json
+            trial-ai/phase-*/output/OPENHANDS-SDK-EVENTS.json
+            trial-ai/native-probe/output/NATIVE-*.jsonl
+            trial-ai/native-probe/output/NATIVE-*.log
+            trial-ai/phase-*/output/NATIVE-*.jsonl
+            trial-ai/phase-*/output/NATIVE-*.log
+            DOWNLOAD-*-MEASUREMENTS.json
+            DOWNLOAD-*-FAILURE.json
+            RESOURCE-PREFLIGHT.json
+            MODEL-STORE-VERIFICATION.json
+            trial-ai/LINUX-GATE.json
+            trial-ai/STAGE-ONE-FAILURE.json
+            trial-ai/ISOLATION-TRACE.jsonl
+            trial-ai/ISOLATION-STDERR.log
+            trial-ai/isolation/output/ISOLATION-PROBE.json
+            trial-ai/isolation/output/ISOLATION-FAILURE.json
+            trial-ai/isolation/output/ISOLATION-CLI.jsonl
+            trial-ai/isolation/output/ISOLATION-PROTOCOL.json
+            trial-ai/isolation/output/ATOMIC-ISOLATION-CLI.jsonl
+            trial-ai/isolation/output/ATOMIC-ISOLATION-RESULT.json
+            trial-ai/isolation/output/ATOMIC-ISOLATION-PROTOCOL.json
+            trial-ai/NATIVE-TOOL-GATE.json
+            trial-ai/native-probe/TRACE.jsonl
+            trial-ai/native-probe/STDERR.log
+            trial-ai/native-probe/FAILURE.json
+            trial-ai/native-probe/TESTS.tap
+            trial-ai/native-probe/output/OPENCODE-CLI.jsonl
+            trial-ai/native-probe/output/PARTIAL-CHECKPOINT.json
+            trial-ai/native-probe/output/protocol/*.json
+            trial-ai/planner/**/*.json
+            trial-ai/planner/*.jsonl
+            trial-ai/planner/*.log
+            trial-ai/JOURNAL.jsonl
+            trial-ai/TESTS-*.tap
+            trial-ai/FAILURE.json
+            trial-ai/BUILD.log
+            trial-ai/isolation/output/KIMI-*.json
+            trial-ai/isolation/output/KIMI-*.jsonl
+            trial-ai/native-probe/output/KIMI-*.jsonl
+            trial-ai/phase-*/output/KIMI-*.jsonl
+            trial-ai/phase-*/TRACE.jsonl
+            trial-ai/phase-*/STDERR.log
+            trial-ai/phase-*/output/PARTIAL-CHECKPOINT.json
+            trial-ai/phase-*/output/OPENCODE-CLI.jsonl
+            trial-ai/phase-*/output/protocol/*.json
+          retention-days: 1
+  render-review:
+    needs: isolated-ai
+    if: needs.isolated-ai.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.21.0'
+      - name: Validate authenticated render envelope contracts
+        run: node --test --test-isolation=none render-project/render-envelope.test.mjs
+      - name: Install only integrity-locked render dependencies without install scripts
+        working-directory: render-project/engine
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify and unpack pinned Linux browser
+        run: python3 render-project/download-browser.py
+      - name: Render the exact encrypted project and verify full video decode
+        env:
+          RS_RENDER_MEDIA_KEY: ${{ secrets.RS_RENDER_MEDIA_KEY }}
+          RS_ZERO_SPEND_VERIFIED: ${{ vars.RS_ZERO_SPEND_VERIFIED }}
+        run: node render-project/run-render.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rs-project-render-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            render-project/RENDER-RESULT.rsenc
+            render-project/RENDER-RECEIPT.json
+          if-no-files-found: error
+          retention-days: 1
+  trusted-signing:
+    needs: [isolated-ai, render-review]
+    if: needs.isolated-ai.result == 'success' && needs.render-review.result == 'success'
+    environment: rs-dev-ai-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    env:
+      RS_AI_EXECUTION_AUTHORIZED: 'yes'
+      RS_EXPECTED_AI_PACKET_SHA256: ${{ inputs.packet_sha256 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.19.0'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rs-ai-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: received
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rs-project-render-${{ github.run_id }}-${{ github.run_attempt }}
+          path: received-render
+      - name: Validate JSON evidence and sign; never execute returned source
+        env:
+          RS_AI_SIGNING_KEY: ${{ secrets.RS_AI_SIGNING_KEY }}
+        run: node scripts/cloud-ai/seal-result.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rs-ai-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: AI-BUNDLE.json
+          if-no-files-found: error
+          retention-days: 1
+

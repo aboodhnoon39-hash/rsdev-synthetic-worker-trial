@@ -1,0 +1,6 @@
+import React from 'react';
+import {registerPanel,type PanelProps} from '../panels';
+import {NumInput} from './kit';
+import {editManifestSchema} from '../../prepared-edit/schema';
+const Panel:React.FC<PanelProps>=({manifest,apply,seek})=><section dir="rtl"><h3>عمليات المسودة الأفقية</h3><p>الأوقات بالفريمات؛ تحفظ من زر حفظ العام. دخول الكادر يحفظ أطراف الصورة؛ gain يغير المستوى فقط.</p>{(manifest.nativeOperations??[]).map((o,i)=><div key={i} style={{padding:12,border:'1px solid #597078',margin:8}}><button onClick={()=>seek(o.fromFrame)}>{o.kind} · {o.fromFrame}–{o.toFrame}</button><div style={{height:8,background:'#132b33',position:'relative'}}><span style={{position:'absolute',height:8,background:'#f4bc56',left:`${o.fromFrame/manifest.source.totalFrames*100}%`,width:`${(o.toFrame-o.fromFrame)/manifest.source.totalFrames*100}%`}}/></div>{(['fromFrame','toFrame',...(o.kind==='gain'?['value']:[])] as const).map(key=><NumInput key={key} value={o[key as 'fromFrame']??1} decimals={key==='value'?2:0} label={`${o.kind} ${key}`} onCommit={n=>{try{apply(m=>editManifestSchema.parse({...m,nativeOperations:m.nativeOperations?.map((x,j)=>j===i?{...x,[key]:n}:x)}),'تعديل عملية Phase2');return true;}catch{return false;}}}/>)}</div>)}</section>;
+registerPanel({id:'phase2',title:'عمليات البرومبت',order:50,Component:Panel});

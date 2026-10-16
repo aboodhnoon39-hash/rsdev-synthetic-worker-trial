@@ -3,7 +3,7 @@ import {guestEnvironment} from './cloud-ai/policy.mjs';import {inferenceProfile}
 import {startModelBridge} from './model-bridge.mjs';import {nativePolicy} from './native-policy.mjs';
 if(process.platform!=='linux'||process.versions.node!=='24.21.0'||process.env.RS_REMAINING_MODEL_AUTHORIZED!=='yes')throw Error('authorized-pinned-linux-required');
 const input=JSON.parse(await fs.readFile('/input/PHASE.json','utf8'));
-if(!['codex','openhands'].includes(input.provider)||input.model!=='qwen3:4b'||input.modelLock?.name!==input.model||input.modelLock?.manifestSHA256!==input.modelManifestSHA256||input.allowedFunctions?.length!==1||!['add','multiply'].includes(input.allowedFunctions[0]))throw Error('reviewed-native-phase-required');
+if(!['codex','openhands'].includes(input.provider)||input.model!=='qwen3:4b'||input.modelLock?.name!==input.model||input.modelLock?.manifestSHA256!==input.modelManifestSHA256||input.allowedFunctions?.length!==1||!['add','multiply','assertLocalToolScope'].includes(input.allowedFunctions[0]))throw Error('reviewed-native-phase-required');
 const events=[],started=performance.now(),profile=inferenceProfile(input.model),env={...guestEnvironment({contextTokens:profile.contextTokens}),CODEX_HOME:'/cache/codex',PYTHONPATH:'/opt/openhands',PYTHONDONTWRITEBYTECODE:'1',LITELLM_LOCAL_MODEL_COST_MAP:'True',OTEL_SDK_DISABLED:'true',DO_NOT_TRACK:'1'};
 let bridge,agent,ollama,watch,timer,completedTimer,completedSnapshot,completed=false,raw='',stderr='',peakRSSBytes=0,watchFailure;
 const cpu=async()=>Number((await fs.readFile('/sys/fs/cgroup/cpu.stat','utf8')).match(/^usage_usec (\d+)/m)?.[1]??0),cpuStart=await cpu();

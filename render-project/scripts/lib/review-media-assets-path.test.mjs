@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {projectIDFromManifestPath} from './review-media-assets.mjs';
+test('Windows relative workflow manifests resolve the same project as forward slashes',()=>{assert.equal(projectIDFromManifestPath('Projects\\app-123-abcdef\\ai-workflow-workspace\\edit.json'),'app-123-abcdef');assert.equal(projectIDFromManifestPath('Projects/app-123-abcdef/ai-workflow-workspace/edit.json'),'app-123-abcdef');});
+test('missing, absolute and traversal manifest paths are rejected',()=>{for(const p of [undefined,'edit.json','Projects//edit.json','C:/Projects/app-123/edit.json','Projects/app-123/../edit.json'])assert.throws(()=>projectIDFromManifestPath(p));});

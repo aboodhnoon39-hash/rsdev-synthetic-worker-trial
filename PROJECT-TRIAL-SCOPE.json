@@ -1,0 +1,64 @@
+{
+  "identity": "RS-DEV-PROJECT-PLANNER-RENDER-325a98ee",
+  "profile": "project-scope-v1",
+  "projectFunction": "assertLocalToolScope",
+  "sourceOrigin": "staged-project/scripts/dev-app/coding-local-tool-scope.mjs",
+  "sourceSHA256": "aa7b9868030c58d4ec4f347d0d7c5ec1965286f7181045c3661eb0f936b5afb8",
+  "protectedTests": 6,
+  "reproducedBaseline": {
+    "pass": 5,
+    "fail": 1
+  },
+  "humanReferenceRepairTestOnly": {
+    "pass": 6,
+    "fail": 0
+  },
+  "readySolutionInModelInputs": false,
+  "qualifiedBaselineOpenHandsRun": 38809481193,
+  "planner": {
+    "model": "qwen3:4b",
+    "maxModelRequests": 1,
+    "maxOutputTokens": 1024,
+    "inferenceDeadlineSeconds": 180,
+    "tasks": 2,
+    "taskDeadlineSeconds": 360,
+    "automaticRetries": 0
+  },
+  "nativeRepair": {
+    "provider": "openhands",
+    "sdk": "1.54.0",
+    "maxPhases": 1,
+    "maxModelRequests": 6,
+    "allowedFunctions": [
+      "assertLocalToolScope"
+    ]
+  },
+  "allModelRequestsMaximum": 7,
+  "render": {
+    "projectID": "app-1792004778106-5d7d5a",
+    "frames": 175,
+    "fps": 25,
+    "width": 1080,
+    "height": 1920,
+    "layers": 6,
+    "sourceSHA256": "aa9e374ec45c534133b1f147bb6f6d90674c533204b3857d5c2985fd47d99bd5",
+    "encryptedInputSHA256": "c8e44e6e332d55155ed8a737378ef656b41c4dc921a81b6abe1f2f0e76d2eddc",
+    "encryptedBytes": 4928238,
+    "sourceBytes": 3690694,
+    "encryption": "AES-256-GCM",
+    "keySecret": "RS_RENDER_MEDIA_KEY",
+    "publishPlainMedia": false,
+    "artifactEncryptionRequired": true,
+    "payloadFormat": "json-v1"
+  },
+  "executionMinutes": {
+    "isolatedAI": 20,
+    "render": 10,
+    "signing": 4
+  },
+  "maxPaidUSD": 0,
+  "automaticMerge": false,
+  "main4194Touched": false,
+  "runAuthorized": false,
+  "newCloudDispatches": 0
+}

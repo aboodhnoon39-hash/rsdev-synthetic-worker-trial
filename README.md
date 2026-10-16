@@ -1,0 +1,3 @@
+RS-Dev bounded real-project, model-planner and encrypted-render trial.
+
+Read PROJECT-TRIAL-SCOPE.json. The project snapshot contains the original Windows-prefix bug. No ready repair is supplied to inference. The previous arithmetic workflow remains available only as preserved source; the proposed single dispatch is rs-dev-project-planner-render.yml. Private media and its rendered result are AES-256-GCM encrypted. The media key is never mounted in the AI container or published. All results remain pending review, with no automatic merge or changes to main4194. This package has not been authorized, published or dispatched.

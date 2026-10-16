@@ -22,6 +22,7 @@ RUN ldconfig && python3.12 -m pip install --no-index --no-deps --target /opt/ope
 RUN HOME=/tmp PYTHONPATH=/opt/openhands LITELLM_LOCAL_MODEL_COST_MAP=True OTEL_SDK_DISABLED=true python3.12 -c "import ssl,sqlite3; from openhands.sdk import Agent,LLM,Conversation; from importlib.metadata import version; assert version('openhands-sdk')=='1.54.0'"
 COPY vendor/ollama/ /usr/local/
 COPY vendor/opencode/opencode /usr/local/bin/opencode
+COPY render-project/RENDER-INPUT-PIN.json /render-project/RENDER-INPUT-PIN.json
 COPY scripts/cloud-ai/ /worker/
 COPY scripts/ /worker/
 ENV PYTHONPATH=/opt/openhands

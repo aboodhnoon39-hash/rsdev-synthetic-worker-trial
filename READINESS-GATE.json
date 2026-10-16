@@ -30,5 +30,12 @@
   },
   "previousRun": "38731652959",
   "provider": "codex",
-  "nativePreflightRun": 38797491333
+  "nativePreflightRun": 38797491333,
+  "candidateIdentity": "RS-DEV-PROJECT-PLANNER-RENDER-325a98ee",
+  "localChecksPassed": 90,
+  "localSubprocessChecksBlocked": 10,
+  "actualSDKReadWithMock": true,
+  "actualModelQualification": false,
+  "localRenderBundleBlocked": true,
+  "requiresSpecificNewRunAuthorization": true
 }

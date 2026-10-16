@@ -4,7 +4,7 @@ import {claimKimiCall} from './kimi-wire.mjs';
 export const KIMI_ATOMIC_TOOLS=['read','edit','write'];
 export function createKimiAtomicMCP({root,history,node=process.execPath,emit=()=>{},allowedFunctions=['add'],resolveCall=async request=>String(request.id)}){
  if(!path.isAbsolute(root)||!path.isAbsolute(history))throw Error('absolute-isolated-paths-required');
- if(!Array.isArray(allowedFunctions)||allowedFunctions.length!==1||!['add','multiply'].includes(allowedFunctions[0]))throw Error('kimi-one-phase-function-required');
+ if(!Array.isArray(allowedFunctions)||allowedFunctions.length!==1||!['add','multiply','assertLocalToolScope'].includes(allowedFunctions[0]))throw Error('kimi-one-phase-function-required');
  const executor=createAtomicTools({root,history,node,emit,allowedFunctions});
  const filePath={type:'string',enum:['/task/backend-limit.mjs']},strings={oldString:{type:'string'},newString:{type:'string'}};
  const tools=[{name:'read',description:'Read a permitted synthetic file.',inputSchema:{type:'object',properties:{filePath:{type:'string',enum:['/task/backend-limit.mjs','/task/backend-limit.test.mjs']}},required:['filePath'],additionalProperties:false}},{name:'edit',description:'Replace exactly one complete function copied from the latest source read. Reread after editing.',inputSchema:{type:'object',properties:{filePath,...strings},required:['filePath','oldString','newString'],additionalProperties:false}},{name:'write',description:'Write the permitted source, changing exactly one function; then reread.',inputSchema:{type:'object',properties:{filePath,content:{type:'string'}},required:['filePath','content'],additionalProperties:false}}];
