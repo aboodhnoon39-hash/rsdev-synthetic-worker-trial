@@ -4,3 +4,6 @@
 !scripts
 !scripts/**
 !Dockerfile.ai
+!render-project
+render-project/**
+!render-project/RENDER-INPUT-PIN.json

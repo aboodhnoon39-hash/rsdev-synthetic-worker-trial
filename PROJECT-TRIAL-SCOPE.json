@@ -1,5 +1,5 @@
 {
-  "identity": "RS-DEV-PROJECT-PLANNER-RENDER-325a98ee",
+  "identity": "RS-DEV-PROJECT-CONTEXT-FIX-ccb60ebd",
   "profile": "project-scope-v1",
   "projectFunction": "assertLocalToolScope",
   "sourceOrigin": "staged-project/scripts/dev-app/coding-local-tool-scope.mjs",
